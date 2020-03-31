@@ -7,14 +7,19 @@ from django.urls import reverse
 from .models import Question
 
 
-def create_question(question_text, days):
+def create_question(question_text, days, include_choices=True):
     """
     Create a question with the given `question_text` and published the
     given number of `days` offset to now (negative for questions published
     in the past, positive for questions that have yet to be published).
     """
     time = timezone.now() + datetime.timedelta(days=days)
-    return Question.objects.create(question_text=question_text, pub_date=time)
+    question = Question.objects.create(question_text=question_text, pub_date=time)
+
+    if include_choices:
+        question.choice_set.create(choice_text='Choice 1')
+
+    return question
 
 class QuestionModelTests(TestCase):
     def test_was_published_recently_with_future_question(self):
@@ -100,6 +105,14 @@ class QuestionIndexViewTests(TestCase):
             response.context['latest_question_list'],
             ['<Question: Past question 2.>', '<Question: Past question 1.>']
         )
+
+    def test_question_with_no_choices(self):
+        """
+        The questions index page may not display Questions without Choices.
+        """
+        create_question(question_text="Question without choices", days=-5, include_choices=False)
+        response = self.client.get(reverse('polls:index'))
+        self.assertQuerysetEqual(response.context['latest_question_list'], [])
 
 class QuestionDetailViewTests(TestCase):
     def test_future_question(self):
